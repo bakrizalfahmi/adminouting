@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+<html lang="ms">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard Admin - Sistem Permohonan</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Inter', sans-serif; }
+        .kpi-box {
+            border-radius: 0.75rem;
+            padding: 1.5rem;
+            color: white;
+            transition: transform 0.2s;
+        }
+        .kpi-box:hover {
+            transform: translateY(-5px);
+        }
+    </style>
+</head>
+<body class="bg-gray-100">
+    <div class="container mx-auto p-4 sm:p-6 lg:p-8">
+        <header class="mb-8">
+            <h1 class="text-3xl font-bold text-gray-900">Dashboard Admin Permohonan</h1>
+            <p class="text-gray-600">Paparan keseluruhan permohonan keluar asrama/pulang bermalam.</p>
+        </header>
+
+        <!-- Bahagian KPI -->
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+            <!-- Permohonan Baru -->
+            <div class="kpi-box bg-orange-500 shadow-lg">
+                <h2 class="text-lg font-semibold text-orange-100">Permohonan Baru</h2>
+                <p id="countBaru" class="text-4xl font-bold mt-2">0</p>
+            </div>
+            <!-- Permohonan Lulus -->
+            <div class="kpi-box bg-green-500 shadow-lg">
+                <h2 class="text-lg font-semibold text-green-100">Diluluskan</h2>
+                <p id="countLulus" class="text-4xl font-bold mt-2">0</p>
+            </div>
+            <!-- Permohonan Tolak -->
+            <div class="kpi-box bg-red-500 shadow-lg">
+                <h2 class="text-lg font-semibold text-red-100">Tidak Diluluskan</h2>
+                <p id="countTolak" class="text-4xl font-bold mt-2">0</p>
+            </div>
+            <!-- Permohonan Batal -->
+            <div class="kpi-box bg-gray-500 shadow-lg">
+                <h2 class="text-lg font-semibold text-gray-100">Dibatalkan</h2>
+                <p id="countBatal" class="text-4xl font-bold mt-2">0</p>
+            </div>
+        </div>
+
+        <!-- Bahagian Jadual Permohonan -->
+        <div class="bg-white rounded-xl shadow-lg p-6">
+            <div class="flex justify-between items-center mb-4">
+                 <h2 class="text-xl font-bold text-gray-800">Senarai Permohonan</h2>
+                 <button id="refreshButton" class="bg-blue-500 text-white px-4 py-2 rounded-lg hover:bg-blue-600 text-sm font-medium">Muat Semula</button>
+            </div>
+            <div id="loading" class="text-center py-10">Memuatkan data...</div>
+            <div id="error" class="hidden text-center text-red-500 py-10"></div>
+            <div id="tableContainer" class="overflow-x-auto hidden">
+                <table class="min-w-full divide-y divide-gray-200">
+                    <thead class="bg-gray-50">
+                        <tr>
+                            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Nama Murid</th>
+                            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Tingkatan</th>
+                            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Tujuan</th>
+                            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Tarikh Keluar</th>
+                            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status Semasa</th>
+                            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Tindakan</th>
+                        </tr>
+                    </thead>
+                    <tbody id="adminTableBody" class="bg-white divide-y divide-gray-200">
+                        <!-- Data akan dimasukkan di sini -->
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const WEB_APP_URL = 'https://script.google.com/macros/s/AKfycbwP3Sb_DwlAOFXsSwYeJDaphGZZTARNMHwNnuzFHouNdYTdFppG64a9HrHdAdrFo5-32w/exec';
+
+        const loadingDiv = document.getElementById('loading');
+        const errorDiv = document.getElementById('error');
+        const tableContainer = document.getElementById('tableContainer');
+        const adminTableBody = document.getElementById('adminTableBody');
+        const refreshButton = document.getElementById('refreshButton');
+        
+        function getStatusBadge(status) {
+            status = (status || '').toUpperCase();
+            let classes = 'px-2 inline-flex text-xs leading-5 font-semibold rounded-full ';
+            if (status === 'LULUS') return classes + 'bg-green-100 text-green-800';
+            if (status === 'TOLAK' || status === 'DIBATALKAN') return classes + 'bg-red-100 text-red-800';
+            return classes + 'bg-yellow-100 text-yellow-800';
+        }
+
+        function updateKPIs(applications) {
+            let baru = 0, lulus = 0, tolak = 0, batal = 0;
+            applications.forEach(app => {
+                const status = (app.status || '').toUpperCase();
+                if (status === 'BARU') baru++;
+                else if (status === 'LULUS') lulus++;
+                else if (status === 'TOLAK') tolak++;
+                else if (status === 'DIBATALKAN') batal++;
+            });
+            document.getElementById('countBaru').textContent = baru;
+            document.getElementById('countLulus').textContent = lulus;
+            document.getElementById('countTolak').textContent = tolak;
+            document.getElementById('countBatal').textContent = batal;
+        }
+
+        function renderTable(applications, students) {
+            adminTableBody.innerHTML = '';
+            const studentMap = new Map(students.map(s => [s.kod_waris, s]));
+            
+            const sortedApps = applications.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+
+            sortedApps.forEach(app => {
+                const student = studentMap.get(app.kod_waris);
+                const row = adminTableBody.insertRow();
+                row.innerHTML = `
+                    <td class="px-4 py-4 whitespace-nowrap text-sm font-medium text-gray-900">${student ? student.nama_anak : 'N/A'}</td>
+                    <td class="px-4 py-4 whitespace-nowrap text-sm text-gray-500">${student ? student.tingkatan : 'N/A'}</td>
+                    <td class="px-4 py-4 text-sm text-gray-600">${app.tujuan}</td>
+                    <td class="px-4 py-4 whitespace-nowrap text-sm text-gray-500">${new Date(app.tarikh_keluar).toLocaleDateString('ms-MY')}</td>
+                    <td class="px-4 py-4 whitespace-nowrap text-sm"><span class="${getStatusBadge(app.status)}">${app.status}</span></td>
+                    <td class="px-4 py-4 whitespace-nowrap text-sm font-medium">
+                        <select class="status-dropdown border border-gray-300 rounded-md p-1 text-xs" data-id="${app.id_permohonan}">
+                            <option value="">Pilih Tindakan</option>
+                            <option value="LULUS" ${app.status === 'LULUS' ? 'selected' : ''}>Lulus</option>
+                            <option value="TOLAK" ${app.status === 'TOLAK' ? 'selected' : ''}>Tidak Lulus</option>
+                            <option value="DIBATALKAN" ${app.status === 'DIBATALKAN' ? 'selected' : ''}>Batal</option>
+                        </select>
+                    </td>
+                `;
+            });
+        }
+
+        async function postData(payload) {
+            await fetch(WEB_APP_URL, { method: 'POST', mode: 'no-cors', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+        }
+
+        async function loadData() {
+            loadingDiv.style.display = 'block';
+            errorDiv.style.display = 'none';
+            tableContainer.style.display = 'none';
+            refreshButton.disabled = true;
+
+            try {
+                const response = await fetch(WEB_APP_URL);
+                if (!response.ok) throw new Error(`Ralat Rangkaian: ${response.status}`);
+                const result = await response.json();
+                if (result.status === 'error') throw new Error(result.message);
+                
+                updateKPIs(result.data.permohonan);
+                renderTable(result.data.permohonan, result.data.murid);
+                
+                tableContainer.style.display = 'block';
+            } catch (err) {
+                errorDiv.textContent = `Gagal memuatkan data: ${err.message}`;
+                errorDiv.style.display = 'block';
+            } finally {
+                loadingDiv.style.display = 'none';
+                refreshButton.disabled = false;
+            }
+        }
+
+        adminTableBody.addEventListener('change', async (e) => {
+            if (e.target.classList.contains('status-dropdown')) {
+                const dropdown = e.target;
+                const appId = dropdown.dataset.id;
+                const newStatus = dropdown.value;
+
+                if (!newStatus) return;
+
+                dropdown.disabled = true;
+                
+                try {
+                    await postData({
+                        action: 'updateApplicationStatus',
+                        data: { id_permohonan: appId, new_status: newStatus }
+                    });
+                    // Beri masa untuk server update, kemudian muat semula data
+                    setTimeout(loadData, 1500);
+                } catch (err) {
+                    alert(`Gagal mengemaskini status: ${err.message}`);
+                    dropdown.disabled = false;
+                }
+            }
+        });
+
+        refreshButton.addEventListener('click', loadData);
+        document.addEventListener('DOMContentLoaded', loadData);
+    </script>
+</body>
+</html>
