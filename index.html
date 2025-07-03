@@ -66,6 +66,7 @@
                             <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Tingkatan</th>
                             <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Tujuan</th>
                             <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Tarikh Keluar</th>
+                            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Bukti</th>
                             <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status Semasa</th>
                             <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Tindakan</th>
                         </tr>
@@ -78,8 +79,10 @@
         </div>
     </div>
 
+    <!-- ===== MODAL UNTUK PAPARAN GAMBAR TELAH DIBUANG ===== -->
+
     <script>
-        const WEB_APP_URL = 'https://script.google.com/macros/s/AKfycbwP3Sb_DwlAOFXsSwYeJDaphGZZTARNMHwNnuzFHouNdYTdFppG64a9HrHdAdrFo5-32w/exec';
+        const WEB_APP_URL = 'https://script.google.com/macros/s/AKfycbwGH5ydgDb9GFQrqP3B24w2J5F04SdC7ojEhFVCDsooFWBzTwxXnHECIdqhCFaNi2UyvQ/exec';
 
         const loadingDiv = document.getElementById('loading');
         const errorDiv = document.getElementById('error');
@@ -119,11 +122,20 @@
             sortedApps.forEach(app => {
                 const student = studentMap.get(app.kod_waris);
                 const row = adminTableBody.insertRow();
+
+                // PERUBAHAN: Pautan bukti kini membuka tab baru
+                let buktiHtml = '<span class="text-gray-400">Tiada</span>';
+                if (app.url_bukti && !app.url_bukti.includes('RALAT')) {
+                    // Menambah target="_blank" untuk membuka dalam tab baru
+                    buktiHtml = `<a href="${app.url_bukti}" target="_blank" rel="noopener noreferrer" class="text-blue-600 hover:underline">Lihat Bukti</a>`;
+                }
+
                 row.innerHTML = `
                     <td class="px-4 py-4 whitespace-nowrap text-sm font-medium text-gray-900">${student ? student.nama_anak : 'N/A'}</td>
                     <td class="px-4 py-4 whitespace-nowrap text-sm text-gray-500">${student ? student.tingkatan : 'N/A'}</td>
                     <td class="px-4 py-4 text-sm text-gray-600">${app.tujuan}</td>
                     <td class="px-4 py-4 whitespace-nowrap text-sm text-gray-500">${new Date(app.tarikh_keluar).toLocaleDateString('ms-MY')}</td>
+                    <td class="px-4 py-4 whitespace-nowrap text-sm">${buktiHtml}</td>
                     <td class="px-4 py-4 whitespace-nowrap text-sm"><span class="${getStatusBadge(app.status)}">${app.status}</span></td>
                     <td class="px-4 py-4 whitespace-nowrap text-sm font-medium">
                         <select class="status-dropdown border border-gray-300 rounded-md p-1 text-xs" data-id="${app.id_permohonan}">
@@ -166,6 +178,7 @@
             }
         }
 
+        // Event listener untuk kemas kini status
         adminTableBody.addEventListener('change', async (e) => {
             if (e.target.classList.contains('status-dropdown')) {
                 const dropdown = e.target;
@@ -181,7 +194,6 @@
                         action: 'updateApplicationStatus',
                         data: { id_permohonan: appId, new_status: newStatus }
                     });
-                    // Beri masa untuk server update, kemudian muat semula data
                     setTimeout(loadData, 1500);
                 } catch (err) {
                     alert(`Gagal mengemaskini status: ${err.message}`);
@@ -189,6 +201,8 @@
                 }
             }
         });
+
+        // PERUBAHAN: Event listener untuk modal telah dibuang kerana tidak lagi digunakan
 
         refreshButton.addEventListener('click', loadData);
         document.addEventListener('DOMContentLoaded', loadData);
