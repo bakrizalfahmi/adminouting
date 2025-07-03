@@ -37,14 +37,16 @@
 
         <!-- Bahagian Jadual Permohonan -->
         <div class="bg-white rounded-xl shadow-lg p-6">
-            <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-4">
-                 <h2 class="text-xl font-bold text-gray-800 mb-2 sm:mb-0">Senarai Permohonan</h2>
-                 <div class="text-right">
-                    <button id="refreshButton" class="bg-blue-500 text-white px-4 py-2 rounded-lg hover:bg-blue-600 text-sm font-medium flex items-center gap-2">
+            <div class="flex flex-col sm:flex-row justify-between items-center mb-4">
+                 <h2 class="text-xl font-bold text-gray-800 mb-4 sm:mb-0">Senarai Permohonan</h2>
+                 <div class="flex items-center gap-3">
+                    <div class="border border-black rounded-lg h-10 flex items-center justify-center px-3">
+                        <p id="lastSyncTime" class="text-xs text-red-500 text-center leading-tight"></p>
+                    </div>
+                    <button id="refreshButton" class="bg-blue-500 text-white px-4 py-2 rounded-lg hover:bg-blue-600 text-sm font-medium flex items-center justify-center gap-2 h-10">
                         <span id="refreshButtonText">Muat Semula</span>
                         <div id="refreshSpinner" class="hidden w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
                     </button>
-                    <p id="lastSyncTime" class="text-xs text-red-500 mt-1"></p>
                  </div>
             </div>
             <div id="loading" class="text-center py-10">Memuatkan data...</div>
@@ -68,7 +70,7 @@
         </div>
     </div>
 
-    <!-- ===== MODAL PENGESAHAN ADMIN BARU ===== -->
+    <!-- ===== MODAL PENGESAHAN ADMIN ===== -->
     <div id="adminAuthModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 hidden z-50">
         <div class="bg-white p-6 rounded-lg shadow-xl w-full max-w-sm">
             <h3 class="text-lg font-bold mb-4">Pengesahan Admin</h3>
@@ -110,14 +112,19 @@
         const adminRoles = { 'pgt': 'Pengetua', 'pkh': 'PK HEM', 'kwd': 'Ketua Warden' };
         let pendingAction = null;
 
-        function getStatusBadge(status) { /* ... (fungsi sama) ... */ }
-        function updateKPIs(applications) { /* ... (fungsi sama) ... */ }
-        function renderTable(applications, students) { /* ... (fungsi sama) ... */ }
-        async function postData(payload) { /* ... (fungsi sama) ... */ }
+        function updateSyncTime(isInitial = false) {
+            const now = new Date();
+            const timeString = now.toLocaleTimeString('ms-MY', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+            if (isInitial) {
+                lastSyncTimeEl.innerHTML = `Auto-kemaskini setiap 5 minit.`;
+            } else {
+                lastSyncTimeEl.innerHTML = `Terkini pada: ${timeString}`;
+            }
+        }
 
         async function loadData(isManual = false) {
+            const spinner = document.getElementById('refreshSpinner');
             if (isManual) {
-                const spinner = document.getElementById('refreshSpinner');
                 refreshButton.disabled = true;
                 spinner.classList.remove('hidden');
             }
@@ -133,40 +140,29 @@
                 
                 updateKPIs(result.data.permohonan);
                 renderTable(result.data.permohonan, result.data.murid);
-                
-                const now = new Date();
-                lastSyncTimeEl.textContent = `Data terakhir dikemas kini pada: ${now.toLocaleTimeString('ms-MY')}`;
+                updateSyncTime();
                 
                 tableContainer.style.display = 'block';
             } catch (err) {
                 errorDiv.textContent = `Gagal memuatkan data: ${err.message}`;
-                errorDiv.style.display = 'block';
             } finally {
                 loadingDiv.style.display = 'none';
                 if (isManual) {
-                    const spinner = document.getElementById('refreshSpinner');
                     refreshButton.disabled = false;
                     spinner.classList.add('hidden');
                 }
             }
         }
-
-        adminTableBody.addEventListener('change', (e) => { /* ... (fungsi sama) ... */ });
-        adminCodeInput.addEventListener('input', () => { /* ... (fungsi sama) ... */ });
-        confirmAuthButton.addEventListener('click', async () => { /* ... (fungsi sama) ... */ });
-        cancelAuthButton.addEventListener('click', () => { /* ... (fungsi sama) ... */ });
-
-        refreshButton.addEventListener('click', () => loadData(true));
         
         document.addEventListener('DOMContentLoaded', () => {
             loadData(true); // Muat data kali pertama secara manual
+            updateSyncTime(true); // Set mesej awal
             setInterval(() => {
                 loadData(false); // Muat semula automatik setiap 5 minit
             }, 300000); 
-            lastSyncTimeEl.textContent += ' Data akan dimuat semula secara automatik setiap 5 minit.';
         });
-        
-        // Salin dan tampal fungsi yang tidak berubah
+
+        // ... (semua kod JavaScript yang lain kekal sama) ...
         function getStatusBadge(status) { status = (status || '').toUpperCase(); let classes = 'px-2 inline-flex text-xs leading-5 font-semibold rounded-full '; if (status === 'LULUS') return classes + 'bg-green-100 text-green-800'; if (status === 'TOLAK' || status === 'DIBATALKAN') return classes + 'bg-red-100 text-red-800'; return classes + 'bg-yellow-100 text-yellow-800'; }
         function updateKPIs(applications) { let baru = 0, lulus = 0, tolak = 0, batal = 0; applications.forEach(app => { const status = (app.status || '').toUpperCase(); if (status === 'BARU') baru++; else if (status === 'LULUS') lulus++; else if (status === 'TOLAK') tolak++; else if (status === 'DIBATALKAN') batal++; }); document.getElementById('countBaru').textContent = baru; document.getElementById('countLulus').textContent = lulus; document.getElementById('countTolak').textContent = tolak; document.getElementById('countBatal').textContent = batal; }
         async function postData(payload) { await fetch(WEB_APP_URL, { method: 'POST', mode: 'no-cors', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) }); }
@@ -175,7 +171,7 @@
         adminCodeInput.addEventListener('input', () => { const code = adminCodeInput.value.toLowerCase(); const role = adminRoles[code]; adminRoleDisplay.textContent = role ? `Jawatan: ${role}` : ''; authError.textContent = ''; });
         confirmAuthButton.addEventListener('click', async () => { if (!pendingAction) return; const adminCode = adminCodeInput.value; if (!adminRoles[adminCode.toLowerCase()]) { authError.textContent = 'Kod admin tidak sah.'; return; } const { appId, newStatus, dropdown } = pendingAction; dropdown.disabled = true; adminAuthModal.classList.add('hidden'); try { await postData({ action: 'updateApplicationStatus', data: { id_permohonan: appId, new_status: newStatus, admin_code: adminCode } }); setTimeout(()=>loadData(true), 1500); } catch (err) { alert(`Gagal mengemaskini status: ${err.message}`); dropdown.disabled = false; } finally { pendingAction = null; adminCodeInput.value = ''; adminRoleDisplay.textContent = ''; } });
         cancelAuthButton.addEventListener('click', () => { adminAuthModal.classList.add('hidden'); pendingAction = null; adminCodeInput.value = ''; adminRoleDisplay.textContent = ''; });
-
+        refreshButton.addEventListener('click', () => loadData(true));
     </script>
 </body>
 </html>
